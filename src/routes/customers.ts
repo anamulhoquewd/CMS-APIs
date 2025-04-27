@@ -15,11 +15,6 @@ customers.get("/ids", protect, (c) => customer.getCustomerIds(c));
 // 🔹 Create new customer (Private)
 customers.post("/auth/register", protect, (c) => customer.registerCustomer(c));
 
-// 🔹 Send message to the customer with access key and their information (Only admin)
-// customers.post("/notification", protect, authorize(["admin"]), (c) =>
-//   customer.sendNotification(c)
-// );
-
 // Regenerate Access Key (Only admin)
 customers.post("/regenerate-access-key", protect, authorize(["admin"]), (c) =>
   customer.regenerateAccessKey(c)

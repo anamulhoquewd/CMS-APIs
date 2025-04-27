@@ -79,8 +79,6 @@ const paymentSchema = new Schema<IPaymentDoc>(
 paymentSchema.pre("save", function (next) {
   const validation = paymentSchemaZod.safeParse(this.toObject());
   if (!validation.success) {
-    console.log(`Error on field: ${validation.error.issues[0].path[0]}`);
-    console.log(validation.error.issues[0].message);
     return next(new Error(validation.error.issues[0].message));
   }
   next();

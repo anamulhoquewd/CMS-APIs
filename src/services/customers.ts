@@ -606,7 +606,7 @@ export const regenerateAccessKeyService = async (id: string) => {
     }
 
     // Generate and hash access key. and save finally
-    const reGenerateAccessKey = customer.generateAccessKey();
+    const reGenerateAccessKey = customer.generateAccessKey(60);
 
     // Update customer
     await customer.save();
@@ -658,7 +658,6 @@ export const customerAccessService = async ({
   // Validate access key
   const keyValidation = keySchema.safeParse({ key });
   if (!keyValidation.success) {
-    console.log(keyValidation.error);
     return {
       error: schemaValidationError(
         keyValidation.error,

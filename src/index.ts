@@ -13,8 +13,6 @@ import { startAutoOrderScheduler } from "./services/orders";
 
 config();
 
-const app = new Hono().basePath("/api/v1");
-
 // 🔹 Config MongoDB
 connectDB()
   .then(async () => {
@@ -22,14 +20,20 @@ connectDB()
     const result = await superAdminService();
 
     if (result.success) {
-      console.log(result.message || "Super created successfully!");
+      console.log(result.message || "Super admin created successfully!");
     } else {
       console.log(result.error?.message);
     }
   })
-  .catch((error) => {
+  .catch((error: any) => {
     console.error("Failed to initialize super admin:", error);
   });
+
+export const runtime = "nodejs";
+
+const DOMAIN = process.env.DOMAIN_URL || "http://localhost:3200";
+
+const app = new Hono().basePath("/api/v1");
 
 // 🔹 Initialize middlewares
 app.use("*", logger(), prettyJSON());
@@ -37,14 +41,14 @@ app.use("*", logger(), prettyJSON());
 // 🔹 Cors
 app.use(
   cors({
-    origin: "http://localhost:3000", // Your frontend URL
+    origin: process.env.NODE_ENV === "production" ? DOMAIN : "*", // Your frontend URL
     credentials: true, // Allow cookies
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE"], // Ensure OPTIONS is handled
     allowHeaders: ["Content-Type", "Authorization"], // Allow necessary headers
   })
 );
 
-// ⏰ Start the scheduler every day at 07:00
+// ⏰ Start the scheduler every day at 07:01 AM (adjust time as needed)
 startAutoOrderScheduler();
 
 // 🔹 Health check

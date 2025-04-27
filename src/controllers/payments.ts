@@ -6,7 +6,8 @@ import {
   getPaymentsService,
   getSinglePaymentService,
   registerPaymentService,
-  updatePaymentService,getPaymentCountService
+  updatePaymentService,
+  getPaymentCountService,
 } from "../services";
 
 // 🔹 Get all payments

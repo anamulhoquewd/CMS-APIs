@@ -3,7 +3,7 @@ import {
   generateS3AccessKey,
   generateAccessToken,
   generateRefreshToken,
-  extractFilename
+  extractFilename,
 } from "./users";
 import pagination from "./pagination";
 
@@ -13,5 +13,5 @@ export {
   pagination,
   generateAccessToken,
   generateRefreshToken,
-  extractFilename
+  extractFilename,
 };

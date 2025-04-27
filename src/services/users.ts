@@ -13,12 +13,15 @@ import {
 import idSchema from "../controllers/utils";
 import { s3 } from "./../config/S3";
 import { schemaValidationError } from "./utile";
+import { config } from "dotenv";
 
 // Get environment variables
 const EMAIL_USER = process.env.EMAIL_USER
   ? process.env.EMAIL_USER
   : "example@example.com";
 const EMAIL_PASS = process.env.EMAIL_PASS ? process.env.EMAIL_PASS : "password";
+
+config();
 
 // Get environment variables
 const name = process.env.ADMIN_NAME;
@@ -34,8 +37,8 @@ const AWS_ACCESS_KEY_ID =
 const AWS_SECRET_ACCESS_KEY =
   (process.env.AWS_SECRET_ACCESS_KEY as string) || "12345678";
 
-// Get environment variables
-const DOMAIN = process.env.DOMAIN;
+// Get Domain url from env
+const DOMAIN = process.env.DOMAIN_URL || "http://localhost:3200";
 
 // Create Email Transporter config
 const transporter = nodemailer.createTransport({
@@ -358,12 +361,6 @@ export const updateUserService = async ({
     phone: string;
     NID: string;
     address: string;
-    salaryStatus:
-      | "pending"
-      | "paid"
-      | "partially_paid"
-      | "on_hold"
-      | "rejected";
     role: "admin" | "manager";
   };
 }) => {
@@ -383,9 +380,6 @@ export const updateUserService = async ({
       .regex(/^\d{10}$|^\d{17}$/, "NID must be either 10 or 17 digits")
       .optional(),
     address: z.string().max(100).optional(),
-    salaryStatus: z
-      .enum(["pending", "paid", "partially_paid", "on_hold", "rejected"])
-      .optional(),
     role: z.enum(["admin", "manager", "super_admin"]).optional(),
     active: z.boolean().optional(),
   });
@@ -393,14 +387,12 @@ export const updateUserService = async ({
   // Validate ID
   const idValidation = idSchema.safeParse({ id });
   if (!idValidation.success) {
-    console.log(idValidation.error);
     return { error: schemaValidationError(idValidation.error, "Invalid ID") };
   }
 
   // Validate Body
   const bodyValidation = bodySchema.safeParse(body);
   if (!bodyValidation.success) {
-    console.log(bodyValidation.error);
     return {
       error: schemaValidationError(
         bodyValidation.error,
@@ -682,7 +674,18 @@ export const loginService = async (body: {
     const refreshToken = await generateRefreshToken({ user });
 
     // Refresh token store in database
-    user.refresh = refreshToken;
+    if (!user.refreshTokens) {
+      user.refreshTokens = [];
+    }
+    if (!user.refreshTokens.includes(refreshToken)) {
+      user.refreshTokens.push(refreshToken);
+    }
+
+    // Remove old refresh tokens
+    if (user.refreshTokens.length > 5) {
+      user.refreshTokens = user.refreshTokens.slice(-5); // last 5 tokens
+    }
+
     await user.save();
 
     // Response

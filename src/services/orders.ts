@@ -50,7 +50,7 @@ const DAY_ABBREVIATIONS = ["su", "mo", "tu", "we", "th", "fr", "sa"];
 export function startAutoOrderScheduler() {
   // Run every day at 07:00 (adjust time as needed)
 
-  cron.schedule("0 7 * * *", async () => {
+  cron.schedule("1 7 * * *", async () => {
     try {
       const today = new Date();
       const todayDayAbbr = DAY_ABBREVIATIONS[getDay(today)];
@@ -62,17 +62,6 @@ export function startAutoOrderScheduler() {
         defaultOffDays: { $nin: [todayDayAbbr] },
       });
 
-      console.log(
-        `Found ${customers.length} active customers for ${formattedDate} (${todayDayAbbr})`
-      );
-
-      if (customers.length === 0) {
-        console.log(
-          `No active customers found for ${formattedDate} (${todayDayAbbr})`
-        );
-        return;
-      }
-
       // Create orders for each eligible customer
       await Promise.all(
         customers.map((customer) =>
@@ -82,10 +71,8 @@ export function startAutoOrderScheduler() {
           })
         )
       );
-
-      console.log(`Auto-order generation completed for ${formattedDate}`);
     } catch (error) {
-      console.error("Error in auto-order scheduler:", error);
+      console.error("Error while creating orders automatically: ", error);
     }
   });
 }
@@ -145,7 +132,6 @@ export const registerOrderService = async (body: {
   const bodyValidation = bodySchema.safeParse(body);
 
   if (!bodyValidation.success) {
-    console.log(bodyValidation.error.issues[0].message);
     return {
       error: schemaValidationError(
         bodyValidation.error,
@@ -185,10 +171,7 @@ export const registerOrderService = async (body: {
           fields: [
             {
               name: "date",
-              message: `Order already exists for this date ${format(
-                date,
-                "yyyy-MM-dd"
-              )}`,
+              message: `Order already exists for this date`,
             },
           ],
         },
@@ -216,8 +199,6 @@ export const registerOrderService = async (body: {
     // Update customer amount
     customer.amount += totalAmount;
     await customer.save();
-
-    console.log("Order created successfully", docs);
 
     // Response
     return {
@@ -362,7 +343,7 @@ export const getOrdersService = async (queryParams: GetOrderServiceProps) => {
   }
 };
 
-export const getOrdersCountService = async ({ id }: { id: string }) => {
+export const getOrdersCountService = async ({ id }: { id: string | null }) => {
   const querySchema = z.object({
     id: z
       .string()

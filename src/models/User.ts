@@ -1,4 +1,4 @@
-import { Schema, model, Document, models } from "mongoose";
+import { Schema, model, Document } from "mongoose";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
 import z from "zod";
@@ -19,18 +19,12 @@ const userSchemaZod = z.object({
     message: "NID must be either 10 or 17 digits",
   }),
   role: z.enum(["admin", "manager", "super_admin"]),
-  salaryStatus: z
-    .enum(["pending", "paid", "partially_paid", "on_hold", "rejected"])
-    .default("pending"),
   avatar: z.string().optional(),
-  refresh: z.string().optional(),
+  refreshTokens: z.array(z.string()).optional(),
   resetPasswordToken: z.string().nullish(),
   resetPasswordExpireDate: z.date().nullish(),
   active: z.boolean().default(true),
 });
-
-// 🔹 Mongoose Schema
-export interface IUser extends z.infer<typeof userSchemaZod> {}
 
 // 🔹 Mongoose Document
 export interface IUserDoc extends Document {
@@ -41,9 +35,8 @@ export interface IUserDoc extends Document {
   address?: string;
   NID: string;
   role: "admin" | "manager" | "super_admin";
-  salaryStatus: "pending" | "paid" | "partially_paid" | "on_hold" | "rejected";
   avatar?: string;
-  refresh?: string;
+  refreshTokens?: string[];
   resetPasswordToken?: string | null;
   resetPasswordExpireDate?: Date | null;
   active: boolean;
@@ -65,14 +58,9 @@ const userSchema = new Schema<IUserDoc>(
       required: true,
       enum: ["admin", "manager", "super_admin"],
     },
-    salaryStatus: {
-      type: String,
-      enum: ["pending", "paid", "partially_paid", "on_hold", "rejected"],
-      default: "pending",
-    },
     avatar: { type: String },
     active: { type: Boolean, default: true, required: true },
-    refresh: { type: String },
+    refreshTokens: { type: [String], default: [] },
     resetPasswordToken: { type: String },
     resetPasswordExpireDate: { type: Date },
   },
@@ -126,13 +114,6 @@ userSchema.pre("save", function (next) {
     : userSchemaZod.partial().safeParse(this.toObject());
 
   if (!validation.success) {
-    console.log(`Error on field: ${validation.error.issues[0].path[0]}`);
-    console.log(
-      validation.error.issues.map((issue) => {
-        console.log(issue.message);
-        console.log(issue.path[0]);
-      })
-    );
     return next(new Error(validation.error.issues[0].message));
   }
   next();

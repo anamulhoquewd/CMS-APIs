@@ -4,7 +4,7 @@ import { Customer, Payment } from "../models";
 import { z } from "zod";
 import { defaults } from "../config/defaults";
 import idSchema from "../controllers/utils";
-import { schemaValidationError,calculatePercentage } from "./utile";
+import { schemaValidationError, calculatePercentage } from "./utile";
 import {
   endOfMonth,
   endOfYear,
@@ -314,7 +314,7 @@ export const updatePaymentService = async ({
     // Get previous payment amount
     const prevAmount = payment.amount;
 
-    // Update only provided fields
+    // Update only provided fields (amount, note)
     Object.assign(payment, bodyValidation.data);
     const docs = await payment.save();
 

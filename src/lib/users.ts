@@ -5,9 +5,6 @@ import {
 } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { sign } from "hono/jwt";
-import { config } from "dotenv";
-
-config();
 
 const JWT_ACCESS_SECRET = (process.env.JWT_ACCESS_SECRET as string) || "access";
 const JWT_REFRESH_SECRET =
@@ -86,7 +83,6 @@ const generateAccessToken = async ({
       role: user.role,
       email: user.email,
       exp: Math.floor(Date.now() / 1000) + 60 * expMinutes,
-      // exp: Math.floor(Date.now() / 1000) + 60,
     },
     JWT_ACCESS_SECRET
   );
@@ -111,7 +107,6 @@ const generateRefreshToken = async ({
       id: user._id,
       role: user.role,
       email: user.email,
-      // exp: Math.floor(Date.now() / 1000) + 60 * 5,
       exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * expDays,
     },
     JWT_REFRESH_SECRET

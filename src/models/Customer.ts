@@ -47,11 +47,6 @@ const customerSchemaZod = z
     }
   );
 
-// 🔹 Mongoose Schema
-interface ICustomer extends z.infer<typeof customerSchemaZod> {}
-
-console.log();
-
 // 🔹 Mongoose Document
 interface ICustomerDoc extends Document {
   name: string;
@@ -67,7 +62,7 @@ interface ICustomerDoc extends Document {
   active: boolean;
   accessKey?: string;
   accessKeyExpiredAt?: Date;
-  generateAccessKey: (minutes?: number) => string;
+  generateAccessKey: (days: number) => string;
 }
 
 // 🔹 Mongoose customer scheme
@@ -108,10 +103,10 @@ const customerSchema = new Schema<ICustomerDoc>(
 );
 
 // 🔹 Method to generate access key
-customerSchema.methods.generateAccessKey = function (minutes: number = 60) {
+customerSchema.methods.generateAccessKey = function (days: number = 30) {
   const token = crypto.randomBytes(32).toString("hex");
   this.accessKey = crypto.createHash("sha256").update(token).digest("hex");
-  this.accessKeyExpiredAt = new Date(Date.now() + 1000 * 60 * minutes);
+  this.accessKeyExpiredAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * days);
   return this.accessKey;
 };
 
@@ -119,7 +114,6 @@ customerSchema.methods.generateAccessKey = function (minutes: number = 60) {
 customerSchema.pre("save", function (next) {
   const validation = customerSchemaZod.safeParse(this.toObject());
   if (!validation.success) {
-    console.log(`Error on field: ${validation.error.issues[0].path[0]}`);
     return next(new Error(validation.error.issues[0].message));
   }
   next();

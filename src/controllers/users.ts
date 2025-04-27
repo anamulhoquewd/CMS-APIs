@@ -2,7 +2,6 @@ import { User } from "../models";
 import { Context } from "hono";
 import { decode, verify } from "hono/jwt";
 import { setSignedCookie, getSignedCookie, deleteCookie } from "hono/cookie";
-import { config } from "dotenv";
 import { generateAccessToken } from "./../lib";
 import { defaults } from "../config/defaults";
 import {
@@ -28,10 +27,9 @@ import {
   getUserCountService,
 } from "../services";
 
-config();
-
 const JWT_REFRESH_SECRET =
   (process.env.JWT_REFRESH_SECRET as string) || "refresh";
+const DOMAIN_NAME = process.env.DOMAIN_NAME as string;
 
 // 🔹 Get all users
 const getUsers = async (c: Context) => {
@@ -156,6 +154,15 @@ const updateUser = async (c: Context) => {
 
   const body = await c.req.json();
 
+  const user = c.get("user");
+  const isSelfUpdate = user._id.toString() === id.toString();
+
+  if (isSelfUpdate && user.role === "super_admin") {
+    if (body.role && body.role !== "super_admin") {
+      body.role = "super_admin";
+    }
+  }
+
   const response = await updateUserService({ id, body });
 
   if (response.error) {
@@ -231,14 +238,11 @@ const loginUser = async (c: Context) => {
     response.success.tokens.refreshToken,
     JWT_REFRESH_SECRET,
     {
-      path: "/",
-      secure: process.env.NODE_ENV === "production",
-      domain: process.env.NODE_ENV === "production" ? "vercel.com" : undefined,
       httpOnly: true,
-      // Set the cookie to expire in 7 days
-      maxAge: 60 * 60 * 24 * 7,
-      expires: new Date(Date.now() + 60 * 60 * 24 * 7),
+      secure: process.env.NODE_ENV === "production",
       sameSite: process.env.NODE_ENV === "production" ? "None" : "Lax",
+      domain: process.env.NODE_ENV === "production" ? DOMAIN_NAME : undefined,
+      maxAge: 604800,
     }
   );
 
@@ -263,7 +267,7 @@ const refreshToken = async (c: Context) => {
     }
 
     // Check if refresh token is valid
-    const user = await User.findOne({ refresh: rToken });
+    const user = await User.findOne({ refreshTokens: { $in: [rToken] } });
 
     if (!user) {
       return authorizationError(c, "Forbidden");
@@ -309,10 +313,7 @@ const logout = async (c: Context) => {
     const refreshToken = deleteCookie(c, "refreshToken", {
       path: "/",
       secure: process.env.NODE_ENV === "production",
-      domain:
-        process.env.NODE_ENV === "production"
-          ? "hono-nextjs-tau-ebon.vercel.app"
-          : undefined,
+      domain: process.env.NODE_ENV === "production" ? DOMAIN_NAME : undefined,
     });
 
     if (!refreshToken) {
@@ -325,11 +326,28 @@ const logout = async (c: Context) => {
       return authenticationError(c, "Invalid refresh token on the cookie");
     }
 
-    // Remove refresh token from database
-    const user = await User.updateOne({ _id: payload.id }, { refresh: "" });
+    const token = refreshToken.split(".").splice(0, 3).join(".");
 
-    if (!user) {
-      return authenticationError(c);
+    // Remove refresh token from database
+    const result = await User.updateOne(
+      { _id: payload.id },
+      {
+        $pull: {
+          refreshTokens: token,
+        },
+      }
+    );
+
+    if (result.matchedCount === 0 || result.modifiedCount === 0) {
+      return authenticationError(c); // 401 Unauthorized
+    }
+
+    if (result.matchedCount === 0) {
+      console.warn("User not found during refresh token removal");
+    }
+
+    if (result.modifiedCount === 0) {
+      console.warn("Refresh token not found in user's token list");
     }
 
     // Response
