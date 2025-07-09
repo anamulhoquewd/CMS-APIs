@@ -1,89 +1,77 @@
-import mongoose, { Schema, model, Document } from "mongoose";
-import { z } from "zod";
+import { IOrderDoc, IOrderItem } from "@/interface/order";
+import { Schema, model } from "mongoose";
 
-// 🔹 Zod Schema
-const orderSchemaZod = z.object({
-  customerId: z
-    .any()
-    .transform((val) =>
-      val instanceof mongoose.Types.ObjectId ? val.toString() : val
-    )
-    .refine((val) => mongoose.Types.ObjectId.isValid(val), {
-      message: "Invalid MongoDB User ID format",
-    }),
-  customerName: z.string().min(3).max(50),
-  customerPhone: z
-    .string()
-    .regex(
-      /^01\d{9}$/,
-      "Phone number must start with 01 and be exactly 11 digits"
-    ),
-  price: z.number().min(1),
-  quantity: z.number().min(1),
-  item: z.enum(["lunch", "dinner", "lunch&dinner"]),
-  date: z.date(),
-  note: z.string().optional(),
-});
+// Order Itme Schema
+const orderItemSchema = new Schema<IOrderItem>(
+  {
+    type: {
+      type: String,
+      enum: ["lunch", "dinner"],
+      required: true,
+    },
+    quantity: {
+      type: Number,
+      required: true,
+      min: [1, "Quantity must be at least 1"],
+    },
+    price: {
+      type: Number,
+      required: true,
+      min: [0, "Price must be >= 0"],
+    },
+    subtotal: {
+      type: Number,
+      required: true,
+      min: [0, "Subtotal must be >= 0"],
+    },
+  },
+  { _id: false }
+);
 
-// 🔹 Mongoose Schema
-interface IOrder extends Document {
-  customerId: mongoose.Types.ObjectId;
-  customerName: string;
-  customerPhone: string;
-  price: number;
-  quantity: number;
-  total?: number;
-  item: string;
-  date: Date;
-  note?: string;
-}
-
-// 🔹 Mongoose Schema
-const orderSchema = new Schema<IOrder>(
+// Order  Schema
+const orderSchema = new Schema<IOrderDoc>(
   {
     customerId: {
       type: Schema.Types.ObjectId,
       ref: "Customer",
       required: true,
     },
-    customerName: { type: String, required: true },
-    customerPhone: { type: String, required: true },
-    price: { type: Number, required: true },
-    quantity: { type: Number, required: true },
-    total: { type: Number },
-    item: {
+    createdBy: {
       type: String,
+      enum: ["customer", "manager"],
       required: true,
-      enum: ["lunch", "dinner", "lunch&dinner"],
+    },
+    createdById: {
+      type: Schema.Types.ObjectId,
+      required: true,
+    },
+    items: {
+      type: [orderItemSchema],
+      required: true,
+      validate: [
+        (val: IOrderItem[]) => val.length > 0,
+        "At least one order item is required",
+      ],
+    },
+    total: {
+      type: Number,
+      required: true,
+      min: [0, "Total must be >= 0"],
     },
     date: {
       type: Date,
       required: true,
-      index: true,
     },
-    note: { type: String },
+    note: {
+      type: String,
+    },
   },
-  { timestamps: true }
+  {
+    timestamps: true,
+  }
 );
 
-// 🔹 Middleware: Calculate total
-orderSchema.pre("save", function (this: IOrder, next) {
-  if (this.price && this.quantity) {
-    this.total = this.price * this.quantity;
-  }
-  next();
-});
-
-// 🔹 Middleware: Validate with Zod before saving
-orderSchema.pre("save", function (next) {
-  const validation = orderSchemaZod.safeParse(this.toObject());
-  if (!validation.success) {
-    return next(new Error(validation.error.issues[0].message));
-  }
-  next();
-});
-
-// 🔹 Mongoose order model
-const Order = model<IOrder>("Order", orderSchema);
+// Order model
+const Order = model<IOrderDoc>("Order", orderSchema);
 
 export default Order;

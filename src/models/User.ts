@@ -1,57 +1,16 @@
-import { Schema, model, Document } from "mongoose";
+import { Schema, model } from "mongoose";
 import bcrypt from "bcrypt";
 import crypto from "crypto";
-import z from "zod";
+import { IUserDoc } from "@/interface/user";
 
-// 🔹 Zod Schema for User Validation
-const userSchemaZod = z.object({
-  name: z.string().min(3).max(50),
-  email: z.string().email(),
-  phone: z
-    .string()
-    .regex(
-      /^01\d{9}$/,
-      "Phone number must start with 01 and be exactly 11 digits"
-    ),
-  password: z.string(),
-  address: z.string().max(100).optional(),
-  NID: z.string().refine((val) => /^\d{10}$|^\d{17}$/.test(val), {
-    message: "NID must be either 10 or 17 digits",
-  }),
-  role: z.enum(["admin", "manager", "super_admin"]),
-  avatar: z.string().optional(),
-  refreshTokens: z.array(z.string()).optional(),
-  resetPasswordToken: z.string().nullish(),
-  resetPasswordExpireDate: z.date().nullish(),
-  active: z.boolean().default(true),
-});
-
-// 🔹 Mongoose Document
-export interface IUserDoc extends Document {
-  name: string;
-  email: string;
-  phone: string;
-  password: string;
-  address?: string;
-  NID: string;
-  role: "admin" | "manager" | "super_admin";
-  avatar?: string;
-  refreshTokens?: string[];
-  resetPasswordToken?: string | null;
-  resetPasswordExpireDate?: Date | null;
-  active: boolean;
-  matchPassword: (pass: string) => Promise<boolean>;
-  generateResetPasswordToken: (expMinutes?: number) => string;
-}
-
-// 🔹 Mongoose user Schema
+// User Schema
 const userSchema = new Schema<IUserDoc>(
   {
-    name: { type: String, required: true, minlength: 3, maxlength: 50 },
+    name: { type: String, required: true, trim: true },
     email: { type: String, required: true, unique: true },
     phone: { type: String, required: true, unique: true },
     password: { type: String, required: true, minlength: 8 },
-    address: { type: String, maxlength: 100 },
+    address: { type: String },
     NID: { type: String, required: true, unique: true },
     role: {
       type: String,
@@ -59,38 +18,40 @@ const userSchema = new Schema<IUserDoc>(
       enum: ["admin", "manager", "super_admin"],
     },
     avatar: { type: String },
-    active: { type: Boolean, default: true, required: true },
+    isActive: { type: Boolean, default: true },
+    isDelete: { type: Boolean, default: false },
+
     refreshTokens: { type: [String], default: [] },
-    resetPasswordToken: { type: String },
-    resetPasswordExpireDate: { type: Date },
+    passwordResetToken: { type: String },
+    passwordResetExpireDate: { type: Date },
   },
   {
     timestamps: true,
   }
 );
 
-// 🔹 Method to generate and hash reset token
-userSchema.methods.generateResetPasswordToken = function (expMinutes = 30) {
+// Method to generate and hash reset token
+userSchema.methods.generatePasswordResetToken = function (expMinutes = 30) {
   let resetToken = crypto.randomBytes(32).toString("hex");
 
   // Hash the token and save it in the database
-  resetToken = this.resetPasswordToken = crypto
+  resetToken = this.passwordResetToken = crypto
     .createHash("sha256")
     .update(resetToken)
     .digest("hex");
 
   // Set token expiration
-  this.resetPasswordExpireDate = Date.now() + expMinutes * 60 * 1000; // default 30 minutes
+  this.passwordResetExpireDate = Date.now() + expMinutes * 60 * 1000; // default 30 minutes
 
   return resetToken;
 };
 
-// 🔹 Match user entered password to hashed password in database
+// Match user entered password to hashed password in database
 userSchema.methods.matchPassword = async function (enteredPassword: string) {
   return bcrypt.compare(enteredPassword, this.password);
 };
 
-// 🔹 Hash password
+// Hash password
 userSchema.pre("save", async function (next) {
   if (!this.isModified("password")) {
     // If password is not modified, skip hashing
@@ -107,19 +68,7 @@ userSchema.pre("save", async function (next) {
   next();
 });
 
-// 🔹 Middleware: Validate with Zod before saving
-userSchema.pre("save", function (next) {
-  const validation = this.isNew
-    ? userSchemaZod.safeParse(this.toObject())
-    : userSchemaZod.partial().safeParse(this.toObject());
-
-  if (!validation.success) {
-    return next(new Error(validation.error.issues[0].message));
-  }
-  next();
-});
-
-// 🔹 Mongoose user model
+// User model
 const User = model("User", userSchema);
 
 export default User;

@@ -5,22 +5,20 @@ import { connectDB } from "./config/db";
 import { cors } from "hono/cors";
 import { prettyJSON } from "hono/pretty-json";
 import { logger } from "hono/logger";
-import { notFound, protect } from "./middlewares";
-import { users, customers, orders, payments } from "./routes";
-import { user } from "./controllers";
+import { notFound } from "./middlewares";
+import { auth } from "./routes";
 import { superAdminService } from "./services";
-import { startAutoOrderScheduler } from "./services/orders";
 
 config();
 
-// 🔹 Config MongoDB
+// Config MongoDB
 connectDB()
   .then(async () => {
     // Call the Super Admin Service function after connecting to MongoDB
     const result = await superAdminService();
 
     if (result.success) {
-      console.log(result.message || "Super admin created successfully!");
+      console.log(result.message || "Super created successfully!");
     } else {
       console.log(result.error?.message);
     }
@@ -33,43 +31,29 @@ export const runtime = "nodejs";
 
 const DOMAIN = process.env.DOMAIN_URL || "http://localhost:3200";
 
-const app = new Hono().basePath("/api/v1");
+const app = new Hono().basePath("/api/v2");
 
-// 🔹 Initialize middlewares
+// Initialize middlewares
 app.use("*", logger(), prettyJSON());
 
-// 🔹 Cors
+// Cors
 app.use(
   cors({
-    origin: process.env.NODE_ENV === "production" ? DOMAIN : "*", // Your frontend URL
+    origin:
+      process.env.NODE_ENV === "production" ? DOMAIN : "http://localhost:3001", // Your frontend URL
     credentials: true, // Allow cookies
     allowMethods: ["GET", "POST", "PUT", "PATCH", "DELETE"], // Ensure OPTIONS is handled
     allowHeaders: ["Content-Type", "Authorization"], // Allow necessary headers
   })
 );
 
-// ⏰ Start the scheduler every day at 07:01 AM (adjust time as needed)
-startAutoOrderScheduler();
-
-// 🔹 Health check
+// Health checkm,
 app.get("/health", (c) => c.text("API is healthy!"));
 
-// 🔹 Users Routes
-app.route("/users", users);
+// Auth Routes
+app.route("/auth", auth);
 
-// 🔹 Customers Routes
-app.route("/customers", customers);
-
-// 🔹 Orders Routes
-app.route("/orders", orders);
-
-// 🔹 Payments Routes
-app.route("/payments", payments);
-
-// 🔹 Get me
-app.get("/auth/me", protect, (c) => user.getMe(c));
-
-// 🔹 Global Error Handler
+// Global Error Handler
 app.onError((error: any, c) => {
   console.error("error: ", error);
   return c.json(
@@ -82,7 +66,7 @@ app.onError((error: any, c) => {
   );
 });
 
-// 🔹 Not Found Handler
+// Not Found Handler
 app.notFound((c) => {
   const error = notFound(c);
   return error;

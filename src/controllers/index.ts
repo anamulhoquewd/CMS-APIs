@@ -1,6 +1,3 @@
-import * as user from "./users";
-import * as customer from "./customers";
-import * as order from "./orders";
-import * as payment from "./payments";
+import * as auth from "./auth";
 
-export { user, customer, order, payment };
+export { auth };

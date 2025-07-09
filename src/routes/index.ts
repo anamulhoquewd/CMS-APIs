@@ -1,6 +1,3 @@
-import users from "./users";
-import customers from "./customers";
-import orders from "./orders";
-import payments from "./payments";
+import auth from "./auth";
 
-export { users, orders, customers, payments };
+export { auth };

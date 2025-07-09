@@ -1,125 +1,138 @@
-import { Schema, model, Document } from "mongoose";
-import { z } from "zod";
+import { Schema, model } from "mongoose";
+import { ICustomerDoc, IItemShedule } from "@/interface/customer";
 import crypto from "crypto";
+import bcrypt from "bcrypt";
 
-// 🔹 Zod Schema for Customer Validation
-const customerSchemaZod = z
-  .object({
-    name: z.string().min(3).max(20),
-    phone: z
-      .string()
-      .regex(
-        /^01\d{9}$/,
-        "Phone number must start with 01 and be exactly 11 digits"
-      ),
-    address: z.string().min(2).max(150),
-    defaultItem: z.enum(["lunch", "dinner", "lunch&dinner"], {
-      required_error: "Please select a default item",
-    }),
-    defaultPrice: z.coerce
-      .number()
-      .positive({ message: "Price must be a positive number" }),
-    defaultQuantity: z.coerce
-      .number()
-      .int()
-      .positive({ message: "Quantity must be a positive integer" }),
-    defaultOffDays: z.array(z.string()).default([]),
-    paymentStatus: z.enum(["paid", "partially_paid", "pending"], {
-      required_error: "Please select a payment status",
-    }),
-    paymentSystem: z.enum(["weekly", "monthly"], {
-      required_error: "Please select a payment system",
-    }),
-    amount: z.number().default(0),
-    accessKey: z.string().optional(),
-    accessKeyExpiredAt: z.date().optional(),
-    active: z.boolean().default(true),
-  })
-  .refine(
-    (data) =>
-      data.defaultOffDays?.every((day: string) =>
-        ["sa", "su", "mo", "tu", "we", "th", "fr"].includes(day)
-      ) ?? true,
-    {
-      message:
-        "Default off days must be in the following order: sa, su, mo, tu, we, th, fr",
-      path: ["defaultOffDays"],
-    }
-  );
-
-// 🔹 Mongoose Document
-interface ICustomerDoc extends Document {
-  name: string;
-  phone: string;
-  address: string;
-  defaultItem: "lunch" | "dinner" | "lunch&dinner";
-  defaultPrice: number;
-  defaultQuantity: number;
-  defaultOffDays: ["sa" | "su" | "mo" | "tu" | "we" | "th" | "fr"];
-  paymentStatus: "paid" | "partially_paid" | "pending";
-  paymentSystem: "weekly" | "monthly";
-  amount: number;
-  active: boolean;
-  accessKey?: string;
-  accessKeyExpiredAt?: Date;
-  generateAccessKey: (days: number) => string;
-}
-
-// 🔹 Mongoose customer scheme
-const customerSchema = new Schema<ICustomerDoc>(
+// Schedule Item Schema
+const scheduleItemSchema = new Schema<IItemShedule>(
   {
-    name: { type: String, required: true, minlength: 3, maxlength: 50 },
-    phone: { type: String, required: true, unique: true },
-    address: { type: String, required: true, maxlength: 100 },
-    defaultItem: {
-      type: String,
-      enum: ["lunch", "dinner", "lunch&dinner"],
-      required: true,
+    date: { type: String, required: true },
+    lunch: { type: Boolean, required: true },
+    dinner: { type: Boolean, required: true },
+    lunchQuantity: {
+      type: Number,
+      required: function (this: any): boolean {
+        return this.lunch === true;
+      },
+      min: 0,
     },
-    defaultPrice: { type: Number, required: true },
-    defaultQuantity: { type: Number, required: true },
-    defaultOffDays: {
-      type: [String],
-      enum: ["sa", "su", "mo", "tu", "we", "th", "fr"],
-      required: true,
+    dinnerQuantity: {
+      type: Number,
+      required: function (this: any): boolean {
+        return this.dinner === true;
+      },
+      min: 0,
     },
-    paymentStatus: {
-      type: String,
-      enum: ["paid", "partially_paid", "pending"],
-      default: "pending",
+    lunchPrice: {
+      type: Number,
+      required: function (this: any): boolean {
+        return this.lunch === true;
+      },
     },
-    paymentSystem: {
-      type: String,
-      enum: ["weekly", "monthly"],
-      default: "weekly",
-      required: true,
+    dinnerPrice: {
+      type: Number,
+      required: function (this: any): boolean {
+        return this.dinner === true;
+      },
     },
-    amount: { type: Number, default: 0 },
-    accessKey: { type: String },
-    accessKeyExpiredAt: { type: Date },
-    active: { type: Boolean, default: true },
   },
-  { timestamps: true }
+  { _id: false }
 );
 
-// 🔹 Method to generate access key
-customerSchema.methods.generateAccessKey = function (days: number = 30) {
-  const token = crypto.randomBytes(32).toString("hex");
-  this.accessKey = crypto.createHash("sha256").update(token).digest("hex");
-  this.accessKeyExpiredAt = new Date(Date.now() + 1000 * 60 * 60 * 24 * days);
-  return this.accessKey;
+// Customer Schema
+const customerSchema = new Schema<ICustomerDoc>(
+  {
+    name: { type: String, required: true, trim: true },
+    phone: {
+      type: String,
+      required: true,
+      unique: true,
+      match: /^\d{11}$/,
+    },
+    email: { type: String, unique: true, sparse: true },
+    password: { type: String, required: true, minlength: 8 },
+    address: { type: String, required: true },
+
+    role: { type: String, enum: ["customer"], default: "customer" },
+
+    avatar: { type: String },
+
+    price: { type: Number, min: 0 },
+    quantity: { type: Number, min: 0 },
+
+    schedule: {
+      type: [scheduleItemSchema],
+      validate: {
+        validator: function (v: any[]) {
+          return v.length <= 7;
+        },
+        message: "Schedule cannot have more than 7 items",
+      },
+    },
+
+    paymentStatus: {
+      type: String,
+      enum: ["paid", "partially_paid", "unpaid"],
+      default: "paid",
+      required: true,
+    },
+    paymentFrequency: {
+      type: String,
+      enum: ["daily", "weekly", "monthly"],
+      required: true,
+    },
+
+    refreshTokens: { type: [String], default: [] },
+    passwordResetToken: { type: String },
+    passwordResetExpireDate: { type: Date },
+
+    isActive: { type: Boolean, default: true },
+    isDelete: { type: Boolean, default: false },
+  },
+  {
+    timestamps: true,
+  }
+);
+
+// Generate Password reset token
+customerSchema.methods.generatePasswordResetToken = function (expMinutes = 30) {
+  let token = crypto.randomBytes(32).toString("hex");
+
+  // Hash the token and save it in the database
+  token = this.passwordResetToken = crypto
+    .createHash("sha256")
+    .update(token)
+    .digest("hex");
+
+  // Set token expiration
+  this.passwordResetExpireDate = Date.now() + expMinutes * 60 * 1000; // default 30 minutes
+
+  return token;
 };
 
-// 🔹 Middleware: Validate with Zod before saving
-customerSchema.pre("save", function (next) {
-  const validation = customerSchemaZod.safeParse(this.toObject());
-  if (!validation.success) {
-    return next(new Error(validation.error.issues[0].message));
+// Check: is password match?
+customerSchema.methods.matchPassword = async function (inputPassword: string) {
+  return bcrypt.compare(inputPassword, this.password);
+};
+
+// Hash password
+customerSchema.pre("save", async function (next) {
+  if (!this.isModified("password")) {
+    // If password is not modified, skip hashing
+    next();
   }
+
+  if (!this.password) {
+    return next(new Error("Password is required"));
+  }
+
+  // Use bcrypt to hash the password
+  const salt = await bcrypt.genSalt(10); // Adjust salt rounds as needed
+  this.password = await bcrypt.hash(this.password, salt);
   next();
 });
 
-// 🔹 Mongoose customer model
+// Customer Model
 const Customer = model<ICustomerDoc>("Customer", customerSchema);
 
 export default Customer;

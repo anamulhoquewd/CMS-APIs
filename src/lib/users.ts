@@ -10,7 +10,16 @@ const JWT_ACCESS_SECRET = (process.env.JWT_ACCESS_SECRET as string) || "access";
 const JWT_REFRESH_SECRET =
   (process.env.JWT_REFRESH_SECRET as string) || "refresh";
 
-// 🔹 Upload Avatar to S3
+interface Props {
+  s3: S3Client;
+  file: File;
+  filename: string;
+  fileType: string;
+  folder: string;
+  bucketName: string;
+  extension: string;
+}
+//  Upload Avatar to S3
 const uploadAvatar = async ({
   s3,
   file,
@@ -18,21 +27,15 @@ const uploadAvatar = async ({
   fileType = "image/jpeg",
   folder = "avatars",
   bucketName,
-}: {
-  s3: S3Client;
-  file: File;
-  filename: string;
-  fileType?: string;
-  folder?: string;
-  bucketName?: string;
-}) => {
+  extension = "webp",
+}: Props) => {
   try {
     const arrayBuffer = await file.arrayBuffer(); // Convert file to Buffer
     const buffer = Buffer.from(arrayBuffer);
 
     const command = new PutObjectCommand({
       Bucket: bucketName,
-      Key: `uploads/${folder}/${filename}`, // Save inside an 'uploads/avatars' folder
+      Key: `uploads/${folder}/${filename}.${extension}`, // Save inside an 'uploads/avatars' folder
       ContentType: fileType,
       Body: buffer,
     });
@@ -43,7 +46,7 @@ const uploadAvatar = async ({
   }
 };
 
-// 🔹 Generate Access Key for the access to the s3 bucket
+//  Generate Access Key for the access to the s3 bucket
 const generateS3AccessKey = async ({
   filename,
   s3,
@@ -69,19 +72,21 @@ const extractFilename = (url: string) => {
   return match ? match[1] : null;
 };
 
-// 🔹 Generate Access Token
+//  Generate Access Token
 const generateAccessToken = async ({
-  user,
+  account,
   expMinutes = 5,
 }: {
-  user: any;
+  account: {
+    id: string;
+    role: "super_admin" | "admin" | "manager" | "customer";
+    identifier: string;
+  };
   expMinutes?: number;
 }) => {
   const token = await sign(
     {
-      id: user._id,
-      role: user.role,
-      email: user.email,
+      ...account,
       exp: Math.floor(Date.now() / 1000) + 60 * expMinutes,
     },
     JWT_ACCESS_SECRET
@@ -94,20 +99,23 @@ const generateAccessToken = async ({
   return token;
 };
 
-// 🔹 Generate Refresh Token
+//  Generate Refresh Token
 const generateRefreshToken = async ({
-  user,
+  account,
   expDays = 7,
 }: {
-  user: any;
+  account: {
+    id: string;
+    role: "super_admin" | "admin" | "manager" | "customer";
+    identifier: string;
+  };
   expDays?: number;
 }) => {
   const token = await sign(
     {
-      id: user._id,
-      role: user.role,
-      email: user.email,
-      exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * expDays,
+      ...account,
+      // exp: Math.floor(Date.now() / 1000) + 60 * 60 * 24 * expDays,
+      exp: Math.floor(Date.now() / 1000) + 60,
     },
     JWT_REFRESH_SECRET
   );

@@ -6,12 +6,23 @@ import {
   authorizationError,
   serverErrorHandler,
 } from "./errors";
-import { protect, authorize } from "./auth";
+import {
+  protect,
+  customerProtect,
+  combinedProtect,
+  authorize,
+  authorizeAccess,
+  authorizeCustomer,
+} from "./auth";
 
 export {
   notFound,
   protect,
+  customerProtect,
+  combinedProtect,
   authorize,
+  authorizeAccess,
+  authorizeCustomer,
   badRequestHandler,
   conflictHandler,
   authenticationError,
