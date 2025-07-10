@@ -4,7 +4,7 @@ import {
   generateAccessToken,
   generateRefreshToken,
   extractFilename,
-} from "./users";
+} from "./auth";
 import pagination from "./pagination";
 
 export {

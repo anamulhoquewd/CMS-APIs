@@ -1,11 +1,15 @@
-import transporter from "@/config/email";
-import { changePassword } from "@/controllers/auth";
 import { ICustomerDoc } from "@/interface/customer";
 import { IUserDoc } from "@/interface/user";
-import { generateAccessToken, generateRefreshToken } from "@/lib";
+import {
+  generateAccessToken,
+  generateRefreshToken,
+  generateS3AccessKey,
+  uploadAvatar,
+} from "@/lib";
 import { Customer, User } from "@/models";
 import { schemaValidationError, stringGenerator } from "@/utils";
 import {
+  avatarValidation,
   changePasswordForm,
   forgotPasswordForm,
   loginFormValidation,
@@ -16,6 +20,9 @@ import { customerValidation } from "@/validation/customer";
 import { userValidation } from "@/validation/user";
 import { verify } from "hono/jwt";
 import { config } from "dotenv";
+import axios from "axios";
+import { reGenerateS3AccessKey } from "./s3";
+import { s3 } from "./../config/S3";
 
 config();
 
@@ -24,22 +31,6 @@ type LoginPayload = {
   phone: string;
   password: string;
 };
-
-type LoginOptions = {
-  userType: "user" | "customer";
-};
-
-// Get environment variables
-const EMAIL_USER = process.env.EMAIL_USER
-  ? process.env.EMAIL_USER
-  : "example@example.com";
-
-// Get environment variables
-const name = process.env.ADMIN_NAME;
-const email = process.env.ADMIN_EMAIL;
-const phone = process.env.ADMIN_PHONE;
-const password = process.env.ADMIN_PASSWORD;
-const NID = process.env.ADMIN_NID;
 
 export const registerUserService = async (body: IUserDoc) => {
   // Validate Body
@@ -121,7 +112,7 @@ export const registerUserService = async (body: IUserDoc) => {
 
     // Send Email to User
     const mailOptions = {
-      from: EMAIL_USER,
+      from: process.env.EMAIL_USER,
       to: email,
       subject: "Your Account Details",
       text: `Hello ${name},\n\nYour account has been created successfully. Here are your login details:\n\nEmail: ${email}\nPassword: ${generatedPassword}\n\nPlease log in and change your password immediately for security.\n\nThank you!`,
@@ -245,11 +236,11 @@ export const superAdminService = async () => {
 
     // Safe Parse for better error handling
     const bodyValidation = userValidation.safeParse({
-      name,
-      email,
-      phone,
-      password,
-      NID,
+      name: process.env.ADMIN_NAME,
+      email: process.env.ADMIN_EMAIL,
+      phone: process.env.ADMIN_PHONE,
+      password: process.env.ADMIN_PASSWORD,
+      NID: process.env.ADMIN_NID,
       role: "super_admin",
     });
 
@@ -294,7 +285,9 @@ export const superAdminService = async () => {
 
 export const loginService = async (
   body: LoginPayload,
-  options: LoginOptions
+  options: {
+    userType: "user" | "customer";
+  }
 ) => {
   const bodyValidation = loginFormValidation.safeParse(body);
 
@@ -633,7 +626,7 @@ export const forgotPasswordService = async (email: string) => {
 
     // Send reset link via email
     const mailOptions = {
-      from: EMAIL_USER,
+      from: process.env.EMAIL_USER,
       to: validatedEmail,
       subject: "Reset your password",
       text: `Hello ${account.name},\n\nClick the link below to reset your password:\n\n${resetUrl}\n\nIf you didn't request this, please ignore this email. This token will expire in 30 minutes.\n\nBest regards,\n${name}`,
@@ -734,6 +727,133 @@ export const resetPasswordService = async ({
       success: {
         success: true,
         message: `Password reset successfully for ${accountType}`,
+      },
+    };
+  } catch (error: any) {
+    return {
+      serverError: {
+        success: false,
+        message: error.message,
+        stack: process.env.NODE_ENV === "production" ? null : error.stack,
+      },
+    };
+  }
+};
+
+export const getMeService = async (account: any) => {
+  try {
+    // Check if avatar is exist
+    const avatarUrl = account?.avatar;
+
+    if (avatarUrl) {
+      try {
+        // Check if signed URL is valid
+        await axios.get(avatarUrl, {
+          headers: { Range: "bytes=0-0" },
+        });
+      } catch (error: any) {
+        if (
+          error.response &&
+          (error.response.status === 403 || error.response.status === 404)
+        ) {
+          // Generate new signed avatarURL and save
+          account.avatar = await reGenerateS3AccessKey(avatarUrl);
+          await account.save();
+        } else {
+          console.error("Error checking signed URL:", error.message);
+          throw error;
+        }
+      }
+    }
+
+    // Response
+    return {
+      success: {
+        success: true,
+        message: "User fetched successfully",
+        data: account,
+      },
+    };
+  } catch (error: any) {
+    return {
+      serverError: {
+        success: false,
+        message: error.message,
+        stack: process.env.NODE_ENV === "production" ? null : error.stack,
+      },
+    };
+  }
+};
+
+export const changeAvatarService = async ({
+  user,
+  filename,
+  body,
+  extension = "webp",
+}: {
+  user: any;
+  filename: string;
+  extension: string;
+  body: {
+    avatar: File;
+  };
+}) => {
+  if (
+    !process.env.AWS_ACCESS_KEY_ID ||
+    !process.env.AWS_SECRET_ACCESS_KEY ||
+    !process.env.AWS_BUCKET_NAME
+  ) {
+    return {
+      error: {
+        message:
+          "AWS_ACCESS_KEY_ID or AWS_SECRET_ACCESS_KEY is missing in env variables",
+      },
+    };
+  }
+
+  // Get file from body
+  const file = body["avatar"] as File;
+  if (!file) {
+    return {
+      error: { message: "No file provided" },
+    };
+  }
+
+  // Safe Parse for better error handling
+  const fileValidation = avatarValidation.safeParse({ avatar: file });
+  if (!fileValidation.success) {
+    return {
+      error: schemaValidationError(
+        fileValidation.error,
+        "Invalid request body"
+      ),
+    };
+  }
+
+  try {
+    const key = `uploads/avatar/${filename}.${extension}`;
+    // Upload to S3
+    uploadAvatar({
+      s3,
+      file: fileValidation.data.avatar,
+      fileType: fileValidation.data.avatar.type,
+      bucketName: process.env.AWS_BUCKET_NAME,
+      key,
+    });
+
+    // Generate signed URL
+    const url = await generateS3AccessKey({ key, s3 });
+
+    // Update user with avatar
+    user.avatar = url;
+    await user.save();
+
+    // Response
+    return {
+      success: {
+        success: true,
+        message: "Avatar updated successfully",
+        data: url,
       },
     };
   } catch (error: any) {

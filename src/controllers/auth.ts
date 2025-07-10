@@ -1,7 +1,5 @@
 import { Context } from "hono";
-import { decode, verify } from "hono/jwt";
 import { setSignedCookie, getSignedCookie, deleteCookie } from "hono/cookie";
-import { generateAccessToken } from "@/lib";
 import { Customer, User } from "@/models";
 import {
   badRequestHandler,
@@ -9,24 +7,13 @@ import {
   authorizationError,
   serverErrorHandler,
 } from "@/middlewares";
-import {
-  loginService,
-  refreshTokenService,
-  registerCustomerService,
-  registerUserService,
-} from "@/services";
-import {
-  changePasswordService,
-  forgotPasswordService,
-  logoutService,
-  resetPasswordService,
-} from "@/services/auth";
+import { auth } from "@/services";
 
 // Register User
 const registerUser = async (c: Context) => {
   const body = await c.req.json();
 
-  const response = await registerUserService(body);
+  const response = await auth.registerUserService(body);
 
   if (response.error) {
     return badRequestHandler(c, response.error);
@@ -43,7 +30,7 @@ const registerUser = async (c: Context) => {
 const registerCustomer = async (c: Context) => {
   const body = await c.req.json();
 
-  const response = await registerCustomerService(body);
+  const response = await auth.registerCustomerService(body);
 
   if (response.error) {
     return badRequestHandler(c, response.error);
@@ -62,7 +49,7 @@ const loginUser = async (c: Context) => {
   const type = c.req.query("userType");
   const userType = type === "customer" ? "customer" : "user";
 
-  const response = await loginService(body, { userType });
+  const response = await auth.loginService(body, { userType });
 
   if (response.error) {
     return badRequestHandler(c, response.error);
@@ -105,7 +92,7 @@ const refreshToken = async (c: Context) => {
 
   if (!token) return authenticationError(c);
 
-  const response = await refreshTokenService(token);
+  const response = await auth.refreshTokenService(token);
 
   if (response.authorizationError) {
     return authorizationError(c, response.authorizationError.message);
@@ -137,7 +124,7 @@ const logout = async (c: Context) => {
 
     const { id, role } = tokenPayload;
 
-    const response = await logoutService({ id, role, rToken });
+    const response = await auth.logoutService({ id, role, rToken });
 
     if (response.authenticationError) return authenticationError(c);
 
@@ -194,7 +181,7 @@ const changePassword = async (c: Context) => {
     return authenticationError(c);
   }
 
-  const response = await changePasswordService({ account, body });
+  const response = await auth.changePasswordService({ account, body });
 
   if (response.error) {
     return badRequestHandler(c, response.error);
@@ -211,7 +198,7 @@ const changePassword = async (c: Context) => {
 const forgotPassword = async (c: Context) => {
   const { email } = await c.req.json();
 
-  const response = await forgotPasswordService(email);
+  const response = await auth.forgotPasswordService(email);
 
   if (response.error) {
     return badRequestHandler(c, response.error);
@@ -232,7 +219,59 @@ const resetPassword = async (c: Context) => {
   // Password come from body
   const { password } = await c.req.json();
 
-  const response = await resetPasswordService({ password, resetToken });
+  const response = await auth.resetPasswordService({ password, resetToken });
+
+  if (response.error) {
+    return badRequestHandler(c, response.error);
+  }
+
+  if (response.serverError) {
+    return serverErrorHandler(c, response.serverError);
+  }
+
+  return c.json(response.success, 200);
+};
+
+// Get Me
+const getMe = async (c: Context) => {
+  const account = (await c.get("user")) || c.get("customer");
+
+  console.log("Account: ", account);
+  // Check if user is authenticated
+  if (!account) {
+    return authenticationError(c);
+  }
+  const response = await auth.getMeService(account);
+
+  if (response.serverError) {
+    return serverErrorHandler(c, response.serverError);
+  }
+
+  return c.json(response.success, 200);
+};
+
+// Change Avatar
+const changeAvatar = async (c: Context) => {
+  const body = await c.req.parseBody();
+  const file = body["avatar"] as File;
+
+  // Get user from auth token
+  const authenticated = (await c.get("user")) || c.get("customer");
+
+  if (!authenticated) {
+    return authenticationError(c);
+  }
+
+  // Generate filename
+  const fileN = c.req.query("filename") || "avatar";
+  const filename = `${fileN}-${Date.now()}`;
+
+  const response = await auth.changeAvatarService({
+    body: { avatar: file },
+    filename,
+    user: authenticated,
+    extension: "jpeg",
+  });
 
   if (response.error) {
     return badRequestHandler(c, response.error);
@@ -254,4 +293,6 @@ export {
   changePassword,
   forgotPassword,
   resetPassword,
+  getMe,
+  changeAvatar,
 };

@@ -6,8 +6,8 @@ import { cors } from "hono/cors";
 import { prettyJSON } from "hono/pretty-json";
 import { logger } from "hono/logger";
 import { notFound } from "./middlewares";
-import { auth } from "./routes";
-import { superAdminService } from "./services";
+import { auth as authService } from "./services";
+import { users, customers, auth as authRoute } from "./routes";
 
 config();
 
@@ -15,7 +15,7 @@ config();
 connectDB()
   .then(async () => {
     // Call the Super Admin Service function after connecting to MongoDB
-    const result = await superAdminService();
+    const result = await authService.superAdminService();
 
     if (result.success) {
       console.log(result.message || "Super created successfully!");
@@ -51,7 +51,13 @@ app.use(
 app.get("/health", (c) => c.text("API is healthy!"));
 
 // Auth Routes
-app.route("/auth", auth);
+app.route("/auth", authRoute);
+
+// Users Routes
+app.route("/users", users);
+
+// Users Routes
+app.route("/customers", customers);
 
 // Global Error Handler
 app.onError((error: any, c) => {

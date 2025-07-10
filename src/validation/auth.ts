@@ -40,10 +40,26 @@ const resetTokenValidation = z.object({
   }),
 });
 
+const avatarValidation = z.object({
+  avatar: z
+    .instanceof(File, { message: "Invalid file format" })
+    .refine((file) => file.size <= 2 * 1024 * 1024, {
+      // 2MB max
+      message: "File size must be less than 2MB",
+    })
+    .refine(
+      (file) => ["image/jpeg", "image/png", "image/jpg"].includes(file.type),
+      {
+        message: "Only JPEG, JPG and PNG files are allowed",
+      }
+    ),
+});
+
 export {
   changePasswordForm,
   loginFormValidation,
   forgotPasswordForm,
   resetPasswordForm,
   resetTokenValidation,
+  avatarValidation,
 };

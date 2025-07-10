@@ -6,10 +6,10 @@ export const reGenerateS3AccessKey = async (oldUrl: string) => {
   const url = new URL(oldUrl);
 
   // Extract filename
-  const filename = url.pathname.substring(url.pathname.lastIndexOf("/") + 1);
+  const key = url.pathname.substring(url.pathname.lastIndexOf("/") + 1);
 
-  console.warn(`Signed URL expired or invalid. Regenerating for: ${filename}`);
+  console.warn(`Signed URL expired or invalid. Regenerating for: ${key}`);
 
   // Generate new signed URL and return
-  return await generateS3AccessKey({ filename, s3 });
+  return await generateS3AccessKey({ key, s3 });
 };

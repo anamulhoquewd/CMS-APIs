@@ -1,7 +1,6 @@
-import { authorize, protect } from "@/middlewares";
+import { authorize, protect, combinedProtect } from "@/middlewares";
 import { Hono } from "hono";
 import { auth as authController } from "@/controllers";
-import { combinedProtect } from "@/middlewares/auth";
 
 const auth = new Hono();
 
@@ -32,5 +31,13 @@ auth.post("/forgot-password", (c) => authController.forgotPassword(c));
 
 // Reset Password (Public)
 auth.put("/reset-password/:resetToken", (c) => authController.resetPassword(c));
+
+// Get me
+auth.get("/me", combinedProtect, (c) => authController.getMe(c));
+
+// Upload Profile Picture
+auth.post("/uploads-avatar", combinedProtect, (c) =>
+  authController.changeAvatar(c)
+);
 
 export default auth;
