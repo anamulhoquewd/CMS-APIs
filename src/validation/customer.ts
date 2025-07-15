@@ -1,31 +1,19 @@
 import { z } from "zod";
 
-const itemScheduleValidation = z
-  .object({
-    date: z.string().refine((val) => !isNaN(Date.parse(val)), {
-      message: "Invalid date format",
+const scheduleSchema = z.array(
+  z.object({
+    date: z.string().refine((val) => /^\d{4}-\d{2}-\d{2}$/.test(val), {
+      message: "Invalid date format (yyyy-MM-dd)",
     }),
-    lunch: z.boolean(),
-    dinner: z.boolean(),
-    lunchQuantity: z.number().int().positive().optional(),
-    dinnerQuantity: z.number().int().positive().optional(),
-    lunchPrice: z.number().int().positive().optional(),
-    dinnerPrice: z.number().int().positive().optional(),
+    lunch: z.boolean().optional(),
+    dinner: z.boolean().optional(),
+    lunchQuantity: z.number().min(1).optional(),
+    dinnerQuantity: z.number().min(1).optional(),
   })
-  .refine(
-    (data) =>
-      (data.lunch ? data.lunchQuantity !== undefined : true) &&
-      (data.dinner ? data.dinnerQuantity !== undefined : true) &&
-      (data.lunch ? data.lunchPrice !== undefined : true) &&
-      (data.dinner ? data.dinnerPrice !== undefined : true),
-    {
-      message:
-        "lunchQuantity is required if lunch is true, dinnerQuantity is required if dinner is true",
-    }
-  );
+);
 
 const customerValidation = z.object({
-  name: z.string().min(1, "Name is required"),
+  name: z.string().min(3, "Name is required"),
   phone: z
     .string()
     .regex(
@@ -34,15 +22,21 @@ const customerValidation = z.object({
     ),
   email: z.string().email().optional(),
   password: z.string().min(8, "Password must be at least 8 characters"),
-  address: z.string().min(1, "Address is required"),
+  address: z.string().min(3, "Address is required"),
   avatar: z.string().url().optional(),
   role: z.enum(["customer"]).optional(),
 
   price: z.number().positive().optional(),
   quantity: z.number().int().positive().optional(),
 
+  lunchPrice: z.number().positive().optional(),
+  dinnerPrice: z.number().positive().optional(),
+
+  lunchQuantity: z.number().int().positive().optional(),
+  dinnerQuantity: z.number().int().positive().optional(),
+
   schedule: z
-    .array(itemScheduleValidation)
+    .array(scheduleSchema)
     .max(7, "Schedule cannot have more than 7 items")
     .optional(),
 
@@ -53,4 +47,4 @@ const customerValidation = z.object({
   isDelete: z.boolean().default(false),
 });
 
-export { customerValidation, itemScheduleValidation };
+export { customerValidation, scheduleSchema };

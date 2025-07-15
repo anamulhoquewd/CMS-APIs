@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { z } from "zod";
 
-// 🔹 Validate the ID (MongoDB ObjectId format)
+// Validate the ID (MongoDB ObjectId format)
 const idSchema = z.object({
   id: z
     .any()

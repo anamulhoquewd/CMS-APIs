@@ -5,9 +5,6 @@ interface IItemShedule {
   lunch: boolean;
   dinner: boolean;
 
-  lunchPrice?: number; // required if lunch = true
-  dinnerPrice?: number; // required if dinner = true
-
   lunchQuantity?: number; // required if dinner = true
   dinnerQuantity?: number; // required if dinner = true
 }
@@ -26,6 +23,12 @@ interface ICustomerDoc extends Document {
 
   price?: number;
   quantity?: number;
+
+  lunchPrice?: number;
+  dinnerPrice?: number;
+
+  lunchQuantity?: number;
+  dinnerQuantity?: number;
 
   schedule?: IItemShedule[];
 

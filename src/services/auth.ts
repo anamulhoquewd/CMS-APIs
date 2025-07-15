@@ -36,19 +36,16 @@ export const registerUserService = async (body: IUserDoc) => {
   // Validate Body
 
   // Safe Parse for better error handling
-  const bodyValidation = userValidation.safeParse(body);
+  const parsed = userValidation.safeParse(body);
 
-  if (!bodyValidation.success) {
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        bodyValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid request body"),
     };
   }
 
   // Destructure Body
-  const { name, email, phone, address, NID, role } = bodyValidation.data;
+  const { name, email, phone, address, NID, role } = parsed.data;
 
   // Check if role is super admin
   if (role === "super_admin") {
@@ -141,13 +138,10 @@ export const registerUserService = async (body: IUserDoc) => {
 
 export const registerCustomerService = async (body: ICustomerDoc) => {
   // Validate the data
-  const bodyValidation = customerValidation.safeParse(body);
-  if (!bodyValidation.success) {
+  const parsed = customerValidation.safeParse(body);
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        bodyValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid request body"),
     };
   }
 
@@ -160,7 +154,13 @@ export const registerCustomerService = async (body: ICustomerDoc) => {
     paymentFrequency,
     price,
     quantity,
-  } = bodyValidation.data;
+
+    lunchPrice,
+    dinnerPrice,
+
+    lunchQuantity,
+    dinnerQuantity,
+  } = parsed.data;
 
   try {
     // Check if customer already exists
@@ -196,6 +196,12 @@ export const registerCustomerService = async (body: ICustomerDoc) => {
       paymentFrequency,
       price,
       quantity,
+
+      lunchPrice,
+      dinnerPrice,
+
+      lunchQuantity,
+      dinnerQuantity,
     });
 
     // Save customer
@@ -235,7 +241,7 @@ export const superAdminService = async () => {
     }
 
     // Safe Parse for better error handling
-    const bodyValidation = userValidation.safeParse({
+    const parsed = userValidation.safeParse({
       name: process.env.ADMIN_NAME,
       email: process.env.ADMIN_EMAIL,
       phone: process.env.ADMIN_PHONE,
@@ -244,7 +250,7 @@ export const superAdminService = async () => {
       role: "super_admin",
     });
 
-    if (!bodyValidation.success) {
+    if (!parsed.success) {
       return {
         success: false,
         error: {
@@ -255,12 +261,12 @@ export const superAdminService = async () => {
 
     // Create Super Admin
     const user = new User({
-      name: bodyValidation.data.name,
-      email: bodyValidation.data.email,
-      phone: bodyValidation.data.phone,
-      password: bodyValidation.data.password,
-      NID: bodyValidation.data.NID,
-      role: bodyValidation.data.role,
+      name: parsed.data.name,
+      email: parsed.data.email,
+      phone: parsed.data.phone,
+      password: parsed.data.password,
+      NID: parsed.data.NID,
+      role: parsed.data.role,
     });
 
     // Save Super Admin
@@ -289,23 +295,20 @@ export const loginService = async (
     userType: "user" | "customer";
   }
 ) => {
-  const bodyValidation = loginFormValidation.safeParse(body);
+  const parsed = loginFormValidation.safeParse(body);
 
-  if (!bodyValidation.success) {
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        bodyValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid request body"),
     };
   }
 
-  const { email, phone, password } = bodyValidation.data;
+  const { email, phone, password } = parsed.data;
   const { userType } = options;
 
   try {
     // Find by email or phone
-    const query: Record<string, any> = {};
+    const query: Record<string, any> = { isDelete: false };
     if (email) {
       query.email = email;
     } else if (phone) {
@@ -316,8 +319,6 @@ export const loginService = async (
         ? await User.findOne(query)
         : await Customer.findOne(query);
 
-    console.log(account, query);
-
     if (!account) {
       return {
         error: {
@@ -325,7 +326,8 @@ export const loginService = async (
           fields: [
             {
               name: "email",
-              message: "User not found with this email or phone",
+              message:
+                "User not found with this email or phone. Or the user has been deleted.",
             },
           ],
         },
@@ -527,19 +529,16 @@ export const changePasswordService = async ({
   };
 }) => {
   // Safe Parse for better error handling
-  const bodyValidation = changePasswordForm.safeParse(body);
+  const parsed = changePasswordForm.safeParse(body);
 
-  if (!bodyValidation.success) {
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        bodyValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid request body"),
     };
   }
 
   // Destructure Body
-  const { currentPassword, newPassword } = bodyValidation.data;
+  const { currentPassword, newPassword } = parsed.data;
 
   try {
     // Validate password
@@ -580,19 +579,16 @@ export const changePasswordService = async ({
 };
 
 export const forgotPasswordService = async (email: string) => {
-  const bodyValidation = forgotPasswordForm.safeParse({ email });
+  const parsed = forgotPasswordForm.safeParse({ email });
 
-  if (!bodyValidation.success) {
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        bodyValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid request body"),
     };
   }
 
   try {
-    const validatedEmail = bodyValidation.data.email;
+    const validatedEmail = parsed.data.email;
     let account: any;
 
     // Search in User
@@ -659,16 +655,13 @@ export const resetPasswordService = async ({
   password: string;
   resetToken: string;
 }) => {
-  const bodyValidation = resetPasswordForm.safeParse({ password });
+  const parsed = resetPasswordForm.safeParse({ password });
   const tokenValidation = resetTokenValidation.safeParse({ resetToken });
 
   // Validate password
-  if (!bodyValidation.success) {
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        bodyValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid request body"),
     };
   }
 
@@ -686,7 +679,7 @@ export const resetPasswordService = async ({
   }
 
   const token = tokenValidation.data.resetToken;
-  const passwordValue = bodyValidation.data.password;
+  const passwordValue = parsed.data.password;
 
   try {
     let account: any;
@@ -820,13 +813,10 @@ export const changeAvatarService = async ({
   }
 
   // Safe Parse for better error handling
-  const fileValidation = avatarValidation.safeParse({ avatar: file });
-  if (!fileValidation.success) {
+  const parsed = avatarValidation.safeParse({ avatar: file });
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        fileValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid request body"),
     };
   }
 
@@ -835,8 +825,8 @@ export const changeAvatarService = async ({
     // Upload to S3
     uploadAvatar({
       s3,
-      file: fileValidation.data.avatar,
-      fileType: fileValidation.data.avatar.type,
+      file: parsed.data.avatar,
+      fileType: parsed.data.avatar.type,
       bucketName: process.env.AWS_BUCKET_NAME,
       key,
     });

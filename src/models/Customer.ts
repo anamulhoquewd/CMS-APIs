@@ -7,8 +7,8 @@ import bcrypt from "bcrypt";
 const scheduleItemSchema = new Schema<IItemShedule>(
   {
     date: { type: String, required: true },
-    lunch: { type: Boolean, required: true },
-    dinner: { type: Boolean, required: true },
+    lunch: { type: Boolean },
+    dinner: { type: Boolean },
     lunchQuantity: {
       type: Number,
       required: function (this: any): boolean {
@@ -22,18 +22,6 @@ const scheduleItemSchema = new Schema<IItemShedule>(
         return this.dinner === true;
       },
       min: 0,
-    },
-    lunchPrice: {
-      type: Number,
-      required: function (this: any): boolean {
-        return this.lunch === true;
-      },
-    },
-    dinnerPrice: {
-      type: Number,
-      required: function (this: any): boolean {
-        return this.dinner === true;
-      },
     },
   },
   { _id: false }
@@ -59,6 +47,12 @@ const customerSchema = new Schema<ICustomerDoc>(
 
     price: { type: Number, min: 0 },
     quantity: { type: Number, min: 0 },
+
+    lunchPrice: { type: Number, min: 0 },
+    dinnerPrice: { type: Number, min: 0 },
+
+    lunchQuantity: { type: Number, min: 0 },
+    dinnerQuantity: { type: Number, min: 0 },
 
     schedule: {
       type: [scheduleItemSchema],

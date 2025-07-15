@@ -1,13 +1,13 @@
 import { serve } from "@hono/node-server";
 import { Hono } from "hono";
 import { config } from "dotenv";
-import { connectDB } from "./config/db";
+import { connectDB } from "@/config/db";
 import { cors } from "hono/cors";
 import { prettyJSON } from "hono/pretty-json";
 import { logger } from "hono/logger";
-import { notFound } from "./middlewares";
-import { auth as authService } from "./services";
-import { users, customers, auth as authRoute } from "./routes";
+import { notFound } from "@/middlewares";
+import { auth as authService } from "@/services";
+import { users, customers, auth as authRoute, orders } from "@/routes";
 
 config();
 
@@ -56,8 +56,11 @@ app.route("/auth", authRoute);
 // Users Routes
 app.route("/users", users);
 
-// Users Routes
+// Customers Routes
 app.route("/customers", customers);
+
+// Orders Routes
+app.route("/orders", orders);
 
 // Global Error Handler
 app.onError((error: any, c) => {

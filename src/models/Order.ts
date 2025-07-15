@@ -38,7 +38,7 @@ const orderSchema = new Schema<IOrderDoc>(
     },
     createdBy: {
       type: String,
-      enum: ["customer", "manager"],
+      enum: ["customer", "manager", "super_admin", "admin"],
       required: true,
     },
     createdById: {

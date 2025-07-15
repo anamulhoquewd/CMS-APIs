@@ -58,10 +58,60 @@ export const getSingleCustomer = async (c: Context) => {
 // Update Customer
 export const updateCustomer = async (c: Context) => {
   const id = c.req.param("id");
+  const type = c.req.query("userType");
+
+  const omitFields =
+    type === "customer"
+      ? {
+          password: true,
+          avatar: true,
+          role: true,
+          schedule: true,
+          isDelete: true,
+          isActive: true,
+          paymentStatus: true,
+          price: true,
+          lunchPrice: true,
+          dinnerPrice: true,
+        }
+      : {
+          password: true,
+          avatar: true,
+          role: true,
+          schedule: true,
+          isDelete: true,
+        };
 
   const body = await c.req.json();
 
-  const response = await customer.updateCustomerService({ body, id });
+  const response = await customer.updateCustomerService({
+    body,
+    id,
+    options: {
+      omitFields,
+    },
+  });
+
+  if (response.error) {
+    return badRequestHandler(c, response.error);
+  }
+
+  if (response.serverError) {
+    return serverErrorHandler(c, response.serverError);
+  }
+
+  return c.json(response.success, 200);
+};
+
+// Set schedule
+export const setSchedule = async (c: Context) => {
+  const actor = c.get("customer");
+  const body = await c.req.json();
+
+  const response = await customer.setScheduleService({
+    body,
+    actor,
+  });
 
   if (response.error) {
     return badRequestHandler(c, response.error);

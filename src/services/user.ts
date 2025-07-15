@@ -19,7 +19,7 @@ export const getUsersService = async (queryParams: {
 }) => {
   console.log(queryParams);
   // Safe Parse for better error handling
-  const queryValidation = sortQueryValidation
+  const parsed = sortQueryValidation
     .extend({
       role: z.enum(["admin", "manager", "super_admin", ""]).optional(),
     })
@@ -30,12 +30,9 @@ export const getUsersService = async (queryParams: {
     });
 
   // Return error if validation fails
-  if (!queryValidation.success) {
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        queryValidation.error,
-        "Invalid query parameters"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid query parameters"),
     };
   }
 
@@ -55,8 +52,8 @@ export const getUsersService = async (queryParams: {
       ];
     }
 
-    if (queryValidation.data.role) {
-      query.role = queryValidation.data.role;
+    if (parsed.data.role) {
+      query.role = parsed.data.role;
     }
 
     // Allowable sort fields
@@ -65,7 +62,7 @@ export const getUsersService = async (queryParams: {
       ? queryParams.sortBy
       : "createdAt";
     const sortDirection =
-      queryValidation.data.sortType.toLocaleLowerCase() === "asc" ? 1 : -1;
+      parsed.data.sortType.toLocaleLowerCase() === "asc" ? 1 : -1;
 
     // Fetch users
     const [users, total] = await Promise.all([
@@ -90,7 +87,7 @@ export const getUsersService = async (queryParams: {
         success: true,
         message: "Users fetched successfully",
         data: users,
-        cocumentCount: total,
+        documentCount: total,
         pagination: getPagination,
       },
     };
@@ -107,15 +104,15 @@ export const getUsersService = async (queryParams: {
 
 export const getSingleUserService = async (id: string) => {
   // Validate ID
-  const idValidation = idSchema.safeParse({ id });
-  if (!idValidation.success) {
-    return { error: schemaValidationError(idValidation.error, "Invalid ID") };
+  const parsed = idSchema.safeParse({ id });
+  if (!parsed.success) {
+    return { error: schemaValidationError(parsed.error, "Invalid ID") };
   }
 
   try {
     // Check if user exists
     const user = await User.findOne({
-      _id: idValidation.data.id,
+      _id: parsed.data.id,
       isDelete: false,
     });
 
@@ -162,25 +159,22 @@ export const updateUserService = async ({
   };
 }) => {
   // Validate ID
-  const idValidation = idSchema.safeParse({ id });
-  if (!idValidation.success) {
-    return { error: schemaValidationError(idValidation.error, "Invalid ID") };
+  const parsed = idSchema.safeParse({ id });
+  if (!parsed.success) {
+    return { error: schemaValidationError(parsed.error, "Invalid ID") };
   }
 
   // Validate Body
-  const bodyValidation = userValidation.partial().safeParse(body);
-  if (!bodyValidation.success) {
+  const bodyParsed = userValidation.partial().safeParse(body);
+  if (!bodyParsed.success) {
     return {
-      error: schemaValidationError(
-        bodyValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(bodyParsed.error, "Invalid request body"),
     };
   }
 
   try {
     // Check if user exists
-    const user = await User.findById(idValidation.data.id);
+    const user = await User.findById(parsed.data.id);
 
     if (!user) {
       return {
@@ -191,7 +185,7 @@ export const updateUserService = async ({
     }
 
     // Check if all fields are empty
-    if (Object.keys(bodyValidation.data).length === 0) {
+    if (Object.keys(bodyParsed.data).length === 0) {
       return {
         success: {
           success: true,
@@ -202,7 +196,7 @@ export const updateUserService = async ({
     }
 
     // Update only provided fields
-    Object.assign(user, bodyValidation.data);
+    Object.assign(user, bodyParsed.data);
     const docs = await user.save();
 
     return {
@@ -249,20 +243,17 @@ export const updateProfileService = async ({
   });
 
   // Validate Body
-  const bodyValidation = bodySchema.safeParse(body);
+  const parsed = bodySchema.safeParse(body);
 
-  if (!bodyValidation.success) {
+  if (!parsed.success) {
     return {
-      error: schemaValidationError(
-        bodyValidation.error,
-        "Invalid request body"
-      ),
+      error: schemaValidationError(parsed.error, "Invalid request body"),
     };
   }
 
   try {
     // Check if all fields are empty
-    if (Object.keys(bodyValidation.data).length === 0) {
+    if (Object.keys(parsed.data).length === 0) {
       return {
         success: {
           success: true,
@@ -273,7 +264,7 @@ export const updateProfileService = async ({
     }
 
     // Update only provided fields
-    Object.assign(user, bodyValidation.data);
+    Object.assign(user, parsed.data);
 
     console.log(user);
 
@@ -299,14 +290,14 @@ export const updateProfileService = async ({
 
 export const deleteUserService = async (id: string) => {
   // Validate ID
-  const idValidation = idSchema.safeParse({ id });
-  if (!idValidation.success) {
-    return { error: schemaValidationError(idValidation.error, "Invalid ID") };
+  const parsed = idSchema.safeParse({ id });
+  if (!parsed.success) {
+    return { error: schemaValidationError(parsed.error, "Invalid ID") };
   }
 
   try {
     // Delete user
-    const user = await User.findById(idValidation.data.id);
+    const user = await User.findById(parsed.data.id);
 
     if (!user) {
       return {

@@ -1,11 +1,13 @@
 import { Types, Document } from "mongoose";
 
-interface IOrderItem {
+interface IOrderItemData {
   type: "lunch" | "dinner";
   quantity: number;
   price: number;
   subtotal: number; // price × quantity
 }
+
+interface IOrderItem extends Document, IOrderItemData {}
 
 interface IOrderDoc extends Document {
   customerId: Types.ObjectId;
@@ -19,4 +21,4 @@ interface IOrderDoc extends Document {
   note?: string;
 }
 
-export { IOrderDoc, IOrderItem };
+export { IOrderDoc, IOrderItem, IOrderItemData };
